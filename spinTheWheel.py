@@ -18,7 +18,17 @@ YOUR_SITE_URL = "https://your-site-url.com" # OpenRouter 建议填写
 YOUR_APP_NAME = "Double Spin Wheel Game"    # OpenRouter 建议填写
 
 # 游戏参数
-WINNING_SCORE = 50  # 达到此分数获胜（到达终点）
+WINNING_SCORE = 30  # 修改为30格
+
+# 特殊格子配置 {格子索引: 类型}
+# 类型: 'forward' (前进), 'backward' (后退)
+SPECIAL_TILES = {
+    4: 'forward',
+    11: 'backward',
+    16: 'forward',
+    22: 'backward',
+    26: 'backward'
+}
 
 # 新的数据结构：Key是组名，Value是列表，列表里包含字典 {'q': 问题, 'a': 答案}
 GAME_DATA = {
@@ -438,7 +448,7 @@ class SpinWheelApp:
         h = self.map_canvas.winfo_height() or 700
         margin = 30
         
-        total_steps = WINNING_SCORE # 50 steps
+        total_steps = WINNING_SCORE 
         
         # 1. 绘制路径连接线
         line_points = []
@@ -468,19 +478,29 @@ class SpinWheelApp:
                 # 终点大格子
                 self.map_canvas.create_oval(cx-tile_size*1.2, cy-tile_size*1.2, cx+tile_size*1.2, cy+tile_size*1.2, fill="#F1C40F", outline="white", width=3)
                 self.map_canvas.create_text(cx, cy, text="WIN", fill="white", font=("Arial", 10, "bold"))
+            
+            # 检查是否为特殊格子
+            elif i in SPECIAL_TILES:
+                effect = SPECIAL_TILES[i]
+                if effect == 'forward':
+                    # 绿色前进格
+                    self.map_canvas.create_rectangle(cx-tile_size/2, cy-tile_size/2, cx+tile_size/2, cy+tile_size/2, fill="#2ECC71", outline="white", width=2)
+                    self.map_canvas.create_text(cx, cy, text=">>", fill="white", font=("Arial", 10, "bold"))
+                else:
+                    # 红色后退格
+                    self.map_canvas.create_rectangle(cx-tile_size/2, cy-tile_size/2, cx+tile_size/2, cy+tile_size/2, fill="#E74C3C", outline="white", width=2)
+                    self.map_canvas.create_text(cx, cy, text="<<", fill="white", font=("Arial", 10, "bold"))
             else:
-                # 普通格子 (圆角矩形效果用 oval 模拟)
+                # 普通格子
                 self.map_canvas.create_rectangle(cx-tile_size/2, cy-tile_size/2, cx+tile_size/2, cy+tile_size/2, fill=color, outline="white", width=1)
-                # 只有每5格显示数字，避免拥挤
                 if i % 5 == 0:
                     self.map_canvas.create_text(cx, cy, text=str(i), fill="white", font=("Arial", 8, "bold"))
 
         # 3. 绘制玩家飞机
-        # 统计每个格子上的玩家数量，以便偏移
         tile_occupancy = {} # {step_index: count}
         
         for name, score in self.scores.items():
-            # 限制分数在 0 - 50
+            # 限制分数在 0 - WINNING_SCORE
             current_step = max(0, min(score, WINNING_SCORE))
             
             # 获取该位置已有的玩家数
@@ -491,7 +511,6 @@ class SpinWheelApp:
             cx, cy, _, _ = self.get_board_coords(current_step, total_steps, w, h, margin)
             
             # 计算偏移 (围绕中心点散开)
-            # 简单的 4方位偏移逻辑
             offset_x = 0
             offset_y = 0
             if count == 1: offset_x = 8; offset_y = 8
@@ -509,7 +528,6 @@ class SpinWheelApp:
             
             # 绘制飞机 (三角形)
             p_size = 10
-            # 向上指的三角形
             points = [
                 px, py - p_size,           # Top
                 px - p_size + 2, py + p_size - 2, # Bottom Left
@@ -518,7 +536,6 @@ class SpinWheelApp:
             ]
             
             self.map_canvas.create_polygon(points, fill=p_color, outline="white", width=1)
-            
             # 显示名字缩写
             self.map_canvas.create_text(px, py - p_size - 8, text=name[:3], fill="#34495E", font=("Arial", 7, "bold"))
 
@@ -815,7 +832,28 @@ class SpinWheelApp:
         """AI 完成后更新状态"""
         # 累加分数
         current_score = self.scores.get(user_name, 0)
+        
+        # 基础总分
         new_total_score = current_score + score
+        
+        special_msg = ""
+        
+        # 检查是否踩到特殊格子
+        # 循环检查，防止连续跳跃（虽然这里只做一次检查，避免死循环）
+        if new_total_score in SPECIAL_TILES:
+            effect = SPECIAL_TILES[new_total_score]
+            steps = random.randint(1, 5) # 随机1-5步
+            
+            if effect == 'forward':
+                new_total_score += steps
+                special_msg = f"\n🚀 LUCKY! Forward {steps} steps!"
+            elif effect == 'backward':
+                new_total_score -= steps
+                special_msg = f"\n⚠️ OOPS! Backward {steps} steps!"
+            
+            # 确保不小于0
+            new_total_score = max(0, new_total_score)
+            
         self.scores[user_name] = new_total_score
         
         # 检查是否获胜
@@ -826,7 +864,7 @@ class SpinWheelApp:
         self.update_leaderboard()
 
         # 准备 Phase 5 显示文本
-        self.ai_result_text = f"Score: {score}/10\nFeedback: {feedback}"
+        self.ai_result_text = f"Score: {score}/10\nFeedback: {feedback}{special_msg}"
         
         # 切换到 Phase 5
         self.phase = 5
