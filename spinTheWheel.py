@@ -732,14 +732,21 @@ class SpinWheelApp:
 
         if self.phase == 0:
             self.phase = 1
-            self.velocity = random.randint(25, 45) 
+            # === 修改处：使用 uniform 生成浮点数，增加随机性 ===
+            self.velocity = random.uniform(30.0, 55.0) 
+            # === 修改处：每次旋转给一个微小的随机摩擦力，防止路径固定 ===
+            self.friction = random.uniform(0.965, 0.983)
+            
             self.spin_btn.config(state=tk.DISABLED, bg="#9E9E9E")
             self.is_spinning = True
             self.animate()
             
         elif self.phase == 2:
             self.phase = 3
-            self.velocity = random.randint(30, 50)
+            # === 修改处：同上，第二轮也增加随机性 ===
+            self.velocity = random.uniform(35.0, 60.0)
+            self.friction = random.uniform(0.978, 0.983)
+            
             self.spin_btn.config(state=tk.DISABLED, bg="#9E9E9E")
             self.is_spinning = True
             self.animate()
