@@ -13,7 +13,7 @@ import re
 # ==========================================
 
 # !!! 请在此处填入您的 OpenRouter API Key !!!
-OPENROUTER_API_KEY = "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" 
+OPENROUTER_API_KEY = "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" 
 YOUR_SITE_URL = "https://your-site-url.com" # OpenRouter 建议填写
 YOUR_APP_NAME = "Double Spin Wheel Game"    # OpenRouter 建议填写
 
