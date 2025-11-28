@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import math
 import random
 import textwrap
@@ -16,6 +16,9 @@ import re
 OPENROUTER_API_KEY = "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" 
 YOUR_SITE_URL = "https://your-site-url.com" # OpenRouter 建议填写
 YOUR_APP_NAME = "Double Spin Wheel Game"    # OpenRouter 建议填写
+
+# 游戏参数
+WINNING_SCORE = 50  # 达到此分数获胜（到达终点）
 
 # 新的数据结构：Key是组名，Value是列表，列表里包含字典 {'q': 问题, 'a': 答案}
 GAME_DATA = {
@@ -149,14 +152,15 @@ GAME_DATA = {
     ]
 }
 
-# 窗口设置 (加大宽度以容纳排行榜)
-WINDOW_WIDTH = 1200 
+# 窗口设置 (加大宽度以容纳排行榜和地图)
+WINDOW_WIDTH = 1600 
 WINDOW_HEIGHT = 1050  
 WHEEL_RADIUS = 350   
 CANVAS_HEIGHT = 750  
 
-# 重新计算中心点 (针对左侧画布)
-CENTER_X = (WINDOW_WIDTH - 300) // 2 # 留300给右侧排行榜
+# 重新计算中心点 (针对左侧画布，基于新的宽度调整)
+# 左侧区域大约占 900-1000px
+CENTER_X = 450 
 CENTER_Y = CANVAS_HEIGHT // 2 
 
 # 美化配色盘
@@ -164,10 +168,18 @@ COLORS = [
     "#FF6B6B", "#4ECDC4", "#FFE66D", "#1A535C", 
     "#FF9F1C", "#2EC459", "#CBF3F0", "#FFBF69"
 ]
+# 飞行器颜色库
+SPACESHIP_COLORS = [
+    "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
+    "#FFA500", "#800080", "#FFC0CB", "#008080", "#FFD700", "#C0C0C0"
+]
 
 # 界面风格
 BG_COLOR = "#F0F2F5"
 SIDEBAR_BG = "#E0E5EC"
+MAP_BG = "#0B0C10" # 深色太空背景
+MAP_ACCENT = "#1F2833"
+MAP_LINE = "#66FCF1"
 BUTTON_FONT = ("Helvetica", 14, "bold")
 LABEL_FONT = ("Helvetica", 28, "bold")
 WHEEL_TEXT_FONT = ("Helvetica", 14, "bold")
@@ -185,7 +197,7 @@ AI_FEEDBACK_FONT = ("Helvetica", 16, "italic")
 class SpinWheelApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Double Spin Wheel Game + AI Leaderboard")
+        self.root.title("Double Spin Wheel Game + Space Race")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.resizable(True, True) 
         self.root.configure(bg=BG_COLOR)
@@ -208,8 +220,10 @@ class SpinWheelApp:
         self.flash_index = -1
         self.flash_callback = None
 
-        # 排行榜数据 {name: score}
+        # 排行榜数据 {name: score} 和 玩家颜色 {name: color}
         self.scores = {}
+        self.player_colors = {}
+        self.winner = None
         
         # UI 控件引用
         self.name_entry = None
@@ -220,12 +234,42 @@ class SpinWheelApp:
         self._setup_layout()
         self.draw_wheel()
         self.update_leaderboard()
+        self.draw_map()
 
     def _setup_layout(self):
-        """初始化双列布局"""
+        """初始化三列布局：游戏区 | 排行榜 | 地图"""
         # 主容器
         self.main_container = tk.Frame(self.root, bg=BG_COLOR)
         self.main_container.pack(fill=tk.BOTH, expand=True)
+
+        # --- 最右侧：地图区域 (Space Map) ---
+        self.map_panel = tk.Frame(self.main_container, bg=MAP_BG, width=400)
+        self.map_panel.pack(side=tk.RIGHT, fill=tk.Y)
+        self.map_panel.pack_propagate(False)
+
+        tk.Label(self.map_panel, text="🚀 SPACE RACE 🚀", font=("Helvetica", 18, "bold"), bg=MAP_BG, fg=MAP_LINE).pack(pady=20)
+        
+        self.map_canvas = tk.Canvas(self.map_panel, bg=MAP_BG, highlightthickness=0)
+        self.map_canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # --- 中右侧：排行榜区域 (Leaderboard) ---
+        self.leaderboard_panel = tk.Frame(self.main_container, bg=SIDEBAR_BG, width=300)
+        self.leaderboard_panel.pack(side=tk.RIGHT, fill=tk.Y)
+        self.leaderboard_panel.pack_propagate(False) # 固定宽度
+
+        tk.Label(self.leaderboard_panel, text="🏆 LEADERBOARD 🏆", font=("Helvetica", 18, "bold"), bg=SIDEBAR_BG, fg="#1A535C").pack(pady=30)
+        
+        # 排行榜列表框
+        self.leaderboard_list = tk.Listbox(
+            self.leaderboard_panel, 
+            font=("Courier", 14), 
+            bg="white", 
+            fg="#333333",
+            bd=0,
+            relief="flat",
+            height=30
+        )
+        self.leaderboard_list.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
 
         # --- 左侧：游戏区域 ---
         self.left_panel = tk.Frame(self.main_container, bg=BG_COLOR)
@@ -286,25 +330,53 @@ class SpinWheelApp:
             bd=0, cursor="hand2"
         )
         self.reset_btn.pack(side=tk.LEFT, padx=20)
-
-        # --- 右侧：排行榜区域 ---
-        self.right_panel = tk.Frame(self.main_container, bg=SIDEBAR_BG, width=300)
-        self.right_panel.pack(side=tk.RIGHT, fill=tk.Y)
-        self.right_panel.pack_propagate(False) # 固定宽度
-
-        tk.Label(self.right_panel, text="🏆 LEADERBOARD 🏆", font=("Helvetica", 18, "bold"), bg=SIDEBAR_BG, fg="#1A535C").pack(pady=30)
         
-        # 排行榜列表框
-        self.leaderboard_list = tk.Listbox(
-            self.right_panel, 
-            font=("Courier", 14), 
-            bg="white", 
-            fg="#333333",
-            bd=0,
-            relief="flat",
-            height=30
+        # 调试按钮
+        self.debug_btn = tk.Button(
+            self.btn_frame, 
+            text="TEST API", 
+            command=self.test_api, 
+            font=("Helvetica", 10, "bold"), 
+            bg="#607D8B", 
+            fg="white", 
+            width=10, 
+            height=2,
+            bd=0, cursor="hand2"
         )
-        self.leaderboard_list.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+        self.debug_btn.pack(side=tk.LEFT, padx=20)
+
+    def test_api(self):
+        """测试 API 连接"""
+        self.info_label.config(text="Testing API connection...", fg="blue")
+        threading.Thread(target=self._run_api_test).start()
+
+    def _run_api_test(self):
+        try:
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": YOUR_SITE_URL,
+                    "X-Title": YOUR_APP_NAME,
+                },
+                data=json.dumps({
+                    "model": "openai/gpt-oss-20b:free",
+                    "messages": [{"role": "user", "content": "Hi"}]
+                }),
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                self.root.after(0, lambda: messagebox.showinfo("API Test", "✅ API Connection Successful!"))
+                self.root.after(0, lambda: self.info_label.config(text="API OK. Ready to play!", fg="#333333"))
+            else:
+                error_msg = f"Error: {response.status_code}\n{response.text}"
+                self.root.after(0, lambda: messagebox.showerror("API Test Failed", error_msg))
+                self.root.after(0, lambda: self.info_label.config(text="API Error!", fg="red"))
+        except Exception as e:
+            self.root.after(0, lambda: messagebox.showerror("API Test Failed", f"Connection Error:\n{str(e)}"))
+            self.root.after(0, lambda: self.info_label.config(text="Connection Failed", fg="red"))
 
     def update_leaderboard(self):
         """刷新右侧排行榜"""
@@ -320,6 +392,69 @@ class SpinWheelApp:
             display_text = f"{rank}. {name[:10]:<10} : {score}"
             self.leaderboard_list.insert(tk.END, display_text)
             rank += 1
+        
+        # 刷新排行榜的同时刷新地图
+        self.draw_map()
+
+    def draw_map(self):
+        """绘制太空地图"""
+        self.map_canvas.delete("all")
+        
+        w = self.map_canvas.winfo_width() or 400
+        h = self.map_canvas.winfo_height() or 700
+        
+        # 绘制背景星星
+        for _ in range(30):
+            x = random.randint(0, w)
+            y = random.randint(0, h)
+            self.map_canvas.create_oval(x, y, x+2, y+2, fill="white")
+            
+        # 绘制轨道
+        margin = 60
+        track_h = h - margin * 2
+        
+        # 终点线 (Top)
+        self.map_canvas.create_line(50, margin, w-50, margin, fill=MAP_LINE, width=3, dash=(5, 5))
+        self.map_canvas.create_text(w//2, margin - 20, text=f"FINISH ({WINNING_SCORE} pts)", fill=MAP_LINE, font=("Helvetica", 12, "bold"))
+        
+        # 起点线 (Bottom)
+        self.map_canvas.create_line(50, h-margin, w-50, h-margin, fill=MAP_LINE, width=3)
+        self.map_canvas.create_text(w//2, h-margin + 20, text="START", fill=MAP_LINE, font=("Helvetica", 12, "bold"))
+        
+        # 绘制玩家飞行器
+        for name, score in self.scores.items():
+            # 获取或分配颜色
+            if name not in self.player_colors:
+                self.player_colors[name] = random.choice(SPACESHIP_COLORS)
+            color = self.player_colors[name]
+            
+            # 计算Y坐标 (score 0 = bottom, score WIN = top)
+            # 限制 score 不超过 winning score 太多以免飞出界
+            vis_score = min(score, WINNING_SCORE)
+            progress = vis_score / WINNING_SCORE
+            y_pos = (h - margin) - (progress * track_h)
+            
+            # X坐标 (随机一点以防重叠)
+            # 使用 name 的 hash 做种子让同一用户的 x 坐标固定
+            random.seed(name) 
+            x_pos = random.randint(80, w-80)
+            random.seed() # 重置种子
+            
+            # 绘制飞行器 (三角形)
+            size = 15
+            points = [
+                x_pos, y_pos - size,      # Top
+                x_pos - size//1.5, y_pos + size, # Bottom Left
+                x_pos + size//1.5, y_pos + size  # Bottom Right
+            ]
+            
+            self.map_canvas.create_polygon(points, fill=color, outline="white", width=2)
+            # 绘制名字标签
+            self.map_canvas.create_text(x_pos, y_pos + size + 10, text=f"{name[:6]}..({score})", fill="white", font=("Arial", 9))
+
+        # 获胜动画文本
+        if self.winner:
+             self.map_canvas.create_text(w//2, h//2, text=f"WINNER:\n{self.winner}", fill="#FFD700", font=("Helvetica", 30, "bold"), justify="center")
 
     def wrap_text_smart(self, text):
         """轮盘内的智能换行"""
@@ -440,7 +575,6 @@ class SpinWheelApp:
             self.canvas.create_text(CENTER_X, 250, text="Enter Name:", font=("Helvetica", 12, "bold"), fill="#666")
             self.canvas.create_text(CENTER_X, 330, text="Your Answer:", font=("Helvetica", 12, "bold"), fill="#666")
 
-            # 注意：Create_window 只需要创建一次，否则会重叠。我们通过状态判断来创建。
             if not self.name_entry:
                 self.name_entry = tk.Entry(self.canvas, font=("Helvetica", 14), justify="center", width=20)
                 self.input_window_name = self.canvas.create_window(CENTER_X, 280, window=self.name_entry)
@@ -448,19 +582,16 @@ class SpinWheelApp:
                 self.answer_text = tk.Text(self.canvas, font=("Helvetica", 14), width=40, height=5)
                 self.input_window_answer = self.canvas.create_window(CENTER_X, 400, window=self.answer_text)
                 
-                # 确保输入框聚焦
                 self.name_entry.focus_set()
 
         # Phase 5: 显示标准答案 + AI 反馈
         elif self.phase == 5:
-            # 清除输入框（如果存在）
             if self.name_entry:
                 self.name_entry.destroy()
                 self.answer_text.destroy()
                 self.name_entry = None
                 self.answer_text = None
 
-            # 顶部小问题
             self.canvas.create_text(
                 CENTER_X, 60, 
                 text=f"Q: {question_text}", 
@@ -471,12 +602,8 @@ class SpinWheelApp:
             )
             self.canvas.create_line(100, 100, WINDOW_WIDTH-400, 100, fill="#DDDDDD", width=2)
             
-            # 显示内容：AI 反馈 (左) + 标准答案 (右) 或者 上下排列
-            # 这里我们采用上下排列，更清晰
-            
             y_cursor = 140
             
-            # AI 反馈部分 (如果有)
             if hasattr(self, 'ai_result_text'):
                 self.canvas.create_text(CENTER_X, y_cursor, text="--- AI Feedback ---", font=("Helvetica", 12, "bold"), fill="#FF9F1C")
                 y_cursor += 30
@@ -490,11 +617,9 @@ class SpinWheelApp:
                     anchor="n",
                     width=WINDOW_WIDTH - 450
                 )
-                # 估算高度增加
                 lines = display_ai.count('\n') + 1
                 y_cursor += lines * 25 + 40
 
-            # 标准答案部分
             self.canvas.create_text(CENTER_X, y_cursor, text="--- Standard Answer ---", font=("Helvetica", 12, "bold"), fill="#28a745")
             y_cursor += 30
             answer_text = self.selected_question_data['a']
@@ -602,7 +727,6 @@ class SpinWheelApp:
                         score = int(data.get("score", 0))
                         feedback = data.get("feedback", "No feedback.")
                     else:
-                        # Fallback parsing
                         score = 5
                         feedback = content
                 except:
@@ -621,9 +745,14 @@ class SpinWheelApp:
         """AI 完成后更新状态"""
         # 累加分数
         current_score = self.scores.get(user_name, 0)
-        self.scores[user_name] = current_score + score
+        new_total_score = current_score + score
+        self.scores[user_name] = new_total_score
         
-        # 刷新排行榜
+        # 检查是否获胜
+        if new_total_score >= WINNING_SCORE and not self.winner:
+            self.winner = user_name
+        
+        # 刷新排行榜和地图
         self.update_leaderboard()
 
         # 准备 Phase 5 显示文本
