@@ -170,16 +170,15 @@ COLORS = [
 ]
 # 飞行器颜色库
 SPACESHIP_COLORS = [
-    "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
-    "#FFA500", "#800080", "#FFC0CB", "#008080", "#FFD700", "#C0C0C0"
+    "#E74C3C", "#2ECC71", "#3498DB", "#9B59B6", "#F1C40F", "#E67E22",
+    "#1ABC9C", "#34495E", "#D35400", "#C0392B", "#16A085", "#8E44AD"
 ]
 
-# 界面风格
+# 界面风格 - 飞行棋主题
 BG_COLOR = "#F0F2F5"
 SIDEBAR_BG = "#E0E5EC"
-MAP_BG = "#0B0C10" # 深色太空背景
-MAP_ACCENT = "#1F2833"
-MAP_LINE = "#66FCF1"
+MAP_BG = "#FDFBF7" # 米色/纸张色背景
+MAP_PATH_COLORS = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#45B7D1"] # 红绿黄蓝循环
 BUTTON_FONT = ("Helvetica", 14, "bold")
 LABEL_FONT = ("Helvetica", 28, "bold")
 WHEEL_TEXT_FONT = ("Helvetica", 14, "bold")
@@ -197,7 +196,7 @@ AI_FEEDBACK_FONT = ("Helvetica", 16, "italic")
 class SpinWheelApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Double Spin Wheel Game + Space Race")
+        self.root.title("Double Spin Wheel Game + Flying Chess")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.resizable(True, True) 
         self.root.configure(bg=BG_COLOR)
@@ -242,12 +241,13 @@ class SpinWheelApp:
         self.main_container = tk.Frame(self.root, bg=BG_COLOR)
         self.main_container.pack(fill=tk.BOTH, expand=True)
 
-        # --- 最右侧：地图区域 (Space Map) ---
+        # --- 最右侧：地图区域 (Flying Chess Map) ---
         self.map_panel = tk.Frame(self.main_container, bg=MAP_BG, width=400)
         self.map_panel.pack(side=tk.RIGHT, fill=tk.Y)
         self.map_panel.pack_propagate(False)
 
-        tk.Label(self.map_panel, text="🚀 SPACE RACE 🚀", font=("Helvetica", 18, "bold"), bg=MAP_BG, fg=MAP_LINE).pack(pady=20)
+        # 地图标题
+        tk.Label(self.map_panel, text="✈️ FLYING CHESS ✈️", font=("Helvetica", 18, "bold"), bg=MAP_BG, fg="#2C3E50").pack(pady=20)
         
         self.map_canvas = tk.Canvas(self.map_panel, bg=MAP_BG, highlightthickness=0)
         self.map_canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -396,65 +396,135 @@ class SpinWheelApp:
         # 刷新排行榜的同时刷新地图
         self.draw_map()
 
+    def get_board_coords(self, step_index, total_steps, w, h, margin=20):
+        """
+        计算棋盘格坐标：S 型 (Snake) 路径，从左下角开始往上
+        """
+        cols = 5
+        rows = math.ceil((total_steps + 1) / cols) 
+        
+        draw_w = w - margin * 2
+        draw_h = h - margin * 2
+        
+        cell_w = draw_w / cols
+        cell_h = draw_h / rows
+        
+        # 限制范围
+        safe_index = min(step_index, total_steps)
+        
+        # 计算行列
+        row_idx = safe_index // cols
+        col_idx = safe_index % cols
+        
+        # Y轴翻转：row 0 在最下方
+        visual_row = (rows - 1) - row_idx
+        
+        # S型翻转：偶数行(0,2..)从左到右，奇数行(1,3..)从右到左
+        if row_idx % 2 == 1:
+            visual_col = (cols - 1) - col_idx
+        else:
+            visual_col = col_idx
+            
+        x = margin + visual_col * cell_w + cell_w / 2
+        y = margin + visual_row * cell_h + cell_h / 2
+        
+        return x, y, cell_w, cell_h
+
     def draw_map(self):
-        """绘制太空地图"""
+        """绘制飞行棋风格地图"""
         self.map_canvas.delete("all")
         
         w = self.map_canvas.winfo_width() or 400
         h = self.map_canvas.winfo_height() or 700
+        margin = 30
         
-        # 绘制背景星星
-        for _ in range(30):
-            x = random.randint(0, w)
-            y = random.randint(0, h)
-            self.map_canvas.create_oval(x, y, x+2, y+2, fill="white")
+        total_steps = WINNING_SCORE # 50 steps
+        
+        # 1. 绘制路径连接线
+        line_points = []
+        for i in range(total_steps + 1):
+            cx, cy, _, _ = self.get_board_coords(i, total_steps, w, h, margin)
+            line_points.append(cx)
+            line_points.append(cy)
+        
+        if len(line_points) > 2:
+            self.map_canvas.create_line(line_points, fill="#BDC3C7", width=4, capstyle=tk.ROUND, joinstyle=tk.ROUND)
+
+        # 2. 绘制棋盘格子
+        for i in range(total_steps + 1):
+            cx, cy, cw, ch = self.get_board_coords(i, total_steps, w, h, margin)
             
-        # 绘制轨道
-        margin = 60
-        track_h = h - margin * 2
+            # 格子尺寸
+            tile_size = min(cw, ch) * 0.65
+            
+            # 颜色循环
+            color = MAP_PATH_COLORS[i % len(MAP_PATH_COLORS)]
+            
+            # 特殊格子：起点和终点
+            if i == 0:
+                self.map_canvas.create_oval(cx-tile_size, cy-tile_size, cx+tile_size, cy+tile_size, fill="#2ECC71", outline="white", width=2)
+                self.map_canvas.create_text(cx, cy, text="START", fill="white", font=("Arial", 9, "bold"))
+            elif i == total_steps:
+                # 终点大格子
+                self.map_canvas.create_oval(cx-tile_size*1.2, cy-tile_size*1.2, cx+tile_size*1.2, cy+tile_size*1.2, fill="#F1C40F", outline="white", width=3)
+                self.map_canvas.create_text(cx, cy, text="WIN", fill="white", font=("Arial", 10, "bold"))
+            else:
+                # 普通格子 (圆角矩形效果用 oval 模拟)
+                self.map_canvas.create_rectangle(cx-tile_size/2, cy-tile_size/2, cx+tile_size/2, cy+tile_size/2, fill=color, outline="white", width=1)
+                # 只有每5格显示数字，避免拥挤
+                if i % 5 == 0:
+                    self.map_canvas.create_text(cx, cy, text=str(i), fill="white", font=("Arial", 8, "bold"))
+
+        # 3. 绘制玩家飞机
+        # 统计每个格子上的玩家数量，以便偏移
+        tile_occupancy = {} # {step_index: count}
         
-        # 终点线 (Top)
-        self.map_canvas.create_line(50, margin, w-50, margin, fill=MAP_LINE, width=3, dash=(5, 5))
-        self.map_canvas.create_text(w//2, margin - 20, text=f"FINISH ({WINNING_SCORE} pts)", fill=MAP_LINE, font=("Helvetica", 12, "bold"))
-        
-        # 起点线 (Bottom)
-        self.map_canvas.create_line(50, h-margin, w-50, h-margin, fill=MAP_LINE, width=3)
-        self.map_canvas.create_text(w//2, h-margin + 20, text="START", fill=MAP_LINE, font=("Helvetica", 12, "bold"))
-        
-        # 绘制玩家飞行器
         for name, score in self.scores.items():
-            # 获取或分配颜色
+            # 限制分数在 0 - 50
+            current_step = max(0, min(score, WINNING_SCORE))
+            
+            # 获取该位置已有的玩家数
+            count = tile_occupancy.get(current_step, 0)
+            tile_occupancy[current_step] = count + 1
+            
+            # 获取格子中心坐标
+            cx, cy, _, _ = self.get_board_coords(current_step, total_steps, w, h, margin)
+            
+            # 计算偏移 (围绕中心点散开)
+            # 简单的 4方位偏移逻辑
+            offset_x = 0
+            offset_y = 0
+            if count == 1: offset_x = 8; offset_y = 8
+            elif count == 2: offset_x = -8; offset_y = 8
+            elif count == 3: offset_x = 8; offset_y = -8
+            elif count >= 4: offset_x = -8; offset_y = -8
+            
+            px = cx + offset_x
+            py = cy + offset_y
+            
+            # 获取/分配颜色
             if name not in self.player_colors:
                 self.player_colors[name] = random.choice(SPACESHIP_COLORS)
-            color = self.player_colors[name]
+            p_color = self.player_colors[name]
             
-            # 计算Y坐标 (score 0 = bottom, score WIN = top)
-            # 限制 score 不超过 winning score 太多以免飞出界
-            vis_score = min(score, WINNING_SCORE)
-            progress = vis_score / WINNING_SCORE
-            y_pos = (h - margin) - (progress * track_h)
-            
-            # X坐标 (随机一点以防重叠)
-            # 使用 name 的 hash 做种子让同一用户的 x 坐标固定
-            random.seed(name) 
-            x_pos = random.randint(80, w-80)
-            random.seed() # 重置种子
-            
-            # 绘制飞行器 (三角形)
-            size = 15
+            # 绘制飞机 (三角形)
+            p_size = 10
+            # 向上指的三角形
             points = [
-                x_pos, y_pos - size,      # Top
-                x_pos - size//1.5, y_pos + size, # Bottom Left
-                x_pos + size//1.5, y_pos + size  # Bottom Right
+                px, py - p_size,           # Top
+                px - p_size + 2, py + p_size - 2, # Bottom Left
+                px, py + p_size - 5,       # Bottom Center (indent)
+                px + p_size - 2, py + p_size - 2  # Bottom Right
             ]
             
-            self.map_canvas.create_polygon(points, fill=color, outline="white", width=2)
-            # 绘制名字标签
-            self.map_canvas.create_text(x_pos, y_pos + size + 10, text=f"{name[:6]}..({score})", fill="white", font=("Arial", 9))
+            self.map_canvas.create_polygon(points, fill=p_color, outline="white", width=1)
+            
+            # 显示名字缩写
+            self.map_canvas.create_text(px, py - p_size - 8, text=name[:3], fill="#34495E", font=("Arial", 7, "bold"))
 
-        # 获胜动画文本
+        # 获胜文字
         if self.winner:
-             self.map_canvas.create_text(w//2, h//2, text=f"WINNER:\n{self.winner}", fill="#FFD700", font=("Helvetica", 30, "bold"), justify="center")
+             self.map_canvas.create_text(w//2, h//2, text=f"WINNER:\n{self.winner}", fill="#E74C3C", font=("Helvetica", 36, "bold"), justify="center")
 
     def wrap_text_smart(self, text):
         """轮盘内的智能换行"""
