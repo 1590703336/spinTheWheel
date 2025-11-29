@@ -1,3 +1,4 @@
+import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 import math
@@ -7,15 +8,56 @@ import requests
 import json
 import threading
 import re
+from pathlib import Path
+
+
+def load_local_env():
+    """
+    将项目根目录下的 .env 内容载入环境变量（不覆盖已有变量）。
+    格式：KEY=VALUE，支持 # 注释以及用引号包裹的值。
+    """
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.exists():
+        return
+
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+
+            if not key:
+                continue
+
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                value = value[1:-1]
+
+            os.environ.setdefault(key, value)
+    except OSError:
+        pass
+
+
+def get_env_value(name, default=""):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip()
+
+
+load_local_env()
 
 # ==========================================
 # --- CONFIG / 配置区域 ---
 # ==========================================
 
-# !!! 请在此处填入您的 OpenRouter API Key !!!
-OPENROUTER_API_KEY = "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" 
-YOUR_SITE_URL = "https://your-site-url.com" # OpenRouter 建议填写
-YOUR_APP_NAME = "Double Spin Wheel Game"    # OpenRouter 建议填写
+# 建议：在项目根目录创建 .env，设置 OPENROUTER_API_KEY=your-key
+OPENROUTER_API_KEY = get_env_value("OPENROUTER_API_KEY")
+YOUR_SITE_URL = get_env_value("YOUR_SITE_URL", "https://your-site-url.com") # OpenRouter 建议填写
+YOUR_APP_NAME = get_env_value("YOUR_APP_NAME", "Double Spin Wheel Game")    # OpenRouter 建议填写
 
 # 游戏参数
 WINNING_SCORE = 30  # 修改为30格
@@ -357,8 +399,24 @@ class SpinWheelApp:
 
     def test_api(self):
         """测试 API 连接"""
+        if not self._ensure_api_key():
+            return
+
         self.info_label.config(text="Testing API connection...", fg="blue")
         threading.Thread(target=self._run_api_test).start()
+
+    def _ensure_api_key(self):
+        """检查 API Key 是否存在"""
+        if OPENROUTER_API_KEY:
+            return True
+
+        warning = "缺少 OPENROUTER_API_KEY，请在 .env 中配置。"
+        self.info_label.config(text=warning, fg="red")
+        messagebox.showerror(
+            "Missing API Key",
+            "未检测到 OPENROUTER_API_KEY。\n请在项目根目录创建 .env 文件并写入：\nOPENROUTER_API_KEY=你的密钥"
+        )
+        return False
 
     def _run_api_test(self):
         try:
@@ -761,6 +819,9 @@ class SpinWheelApp:
             return
         if not user_answer:
             self.info_label.config(text="Please enter an answer!", fg="red")
+            return
+
+        if not self._ensure_api_key():
             return
 
         # 禁用按钮，显示 Loading
