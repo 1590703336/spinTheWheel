@@ -187,7 +187,7 @@ GAME_DATA = {
         },
         {
             "q": "How does one organize themselves to be productive?",
-            "a": "Being independent is expected in the classroom and workplace\n\nBeing able to organize ourselves and manage our time is really essential.\n\nCreating a schedule and breaking up bigger tasks facilitates productivity\n\nBeing able to prioritize helkps you to manage tasks"
+            "a": "Being independent is expected in the classroom and workplace\n\nBeing able to organize ourselves and manage our time is really essential.\n\nCreating a schedule and breaking up bigger tasks facilitates productivity\n\nBeing able to prioritize helps you to manage tasks"
         },
         {
             "q": "Collaboration skills and Do you think employees work alone?",
@@ -793,7 +793,7 @@ class SpinWheelApp:
             # === 修改处：使用 uniform 生成浮点数，增加随机性 ===
             self.velocity = random.uniform(30.0, 55.0) 
             # === 修改处：每次旋转给一个微小的随机摩擦力，防止路径固定 ===
-            self.friction = random.uniform(0.965, 0.983)
+            self.friction = random.uniform(0.85, 0.983)
             
             self.spin_btn.config(state=tk.DISABLED, bg="#9E9E9E")
             self.is_spinning = True
@@ -837,7 +837,7 @@ class SpinWheelApp:
         standard_answer = self.selected_question_data['a']
 
         prompt = f"""
-        You are a strict but encouraging teacher.
+        You are an encouraging and supportive teacher. be objective and fair, do not strict on the format. If the standard answer is personal answer, you should give a objective score based on the student answer.
         Question: {question}
         Standard Answer: {standard_answer}
         Student Answer: {user_answer}
