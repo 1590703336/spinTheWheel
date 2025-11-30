@@ -1,12 +1,18 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist",
-  "framework": "vite",
-  "functions": {
-    "api/*.py": {
-      "runtime": "vercel-python@3.11"
+  "builds": [
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python@1.4.0"
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "frontend/dist",
+        "buildCommand": "cd frontend && npm install && npm run build"
+      }
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
