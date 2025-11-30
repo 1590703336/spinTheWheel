@@ -1035,3 +1035,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = SpinWheelApp(root)
     root.mainloop()
+    print("Game closed") # test
