@@ -3,3 +3,6 @@ __pycache__/
 .DS_Store
 venv/
 .cursor/
+frontend/node_modules/
+frontend/dist/
+.vercel/
