@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 config = {
-    "runtime": "python3.11"
+    "runtime": "vercel-python@3.11"
 }
 
 from backend.logic import (
@@ -18,7 +18,7 @@ from backend.logic import (
 )
 from backend.openrouter import OpenRouterError, grade_answer
 
-app = FastAPI(title="Spin The Wheel API")
+app = FastAPI(title="Spin The Wheel API", config=config)
 
 
 class SpinGroupRequest(BaseModel):
