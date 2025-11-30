@@ -5,6 +5,10 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+config = {
+    "runtime": "python3.11"
+}
+
 from backend.logic import (
     get_question_by_id,
     list_groups,
