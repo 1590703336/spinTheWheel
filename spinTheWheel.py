@@ -260,7 +260,8 @@ class SpinWheelApp:
         self.selected_question_data = None 
         
         # 动画参数
-        self.angle = 0        
+        # 初始角度随机，避免每次重置都从同一位置开始
+        self.angle = random.uniform(0, 360)        
         self.velocity = 0     
         self.friction = 0.98
         self.is_spinning = False
@@ -791,9 +792,9 @@ class SpinWheelApp:
         if self.phase == 0:
             self.phase = 1
             # === 修改处：使用 uniform 生成浮点数，增加随机性 ===
-            self.velocity = random.uniform(30.0, 55.0) 
+            self.velocity = random.uniform(35.0, 45.0) 
             # === 修改处：每次旋转给一个微小的随机摩擦力，防止路径固定 ===
-            self.friction = random.uniform(0.85, 0.983)
+            self.friction = random.uniform(0.958, 0.975)
             
             self.spin_btn.config(state=tk.DISABLED, bg="#9E9E9E")
             self.is_spinning = True
@@ -802,8 +803,8 @@ class SpinWheelApp:
         elif self.phase == 2:
             self.phase = 3
             # === 修改处：同上，第二轮也增加随机性 ===
-            self.velocity = random.uniform(35.0, 60.0)
-            self.friction = random.uniform(0.978, 0.983)
+            self.velocity = random.uniform(35.0, 45.0)
+            self.friction = random.uniform(0.958, 0.975)
             
             self.spin_btn.config(state=tk.DISABLED, bg="#9E9E9E")
             self.is_spinning = True
@@ -837,7 +838,7 @@ class SpinWheelApp:
         standard_answer = self.selected_question_data['a']
 
         prompt = f"""
-        You are an encouraging and supportive teacher. be objective and fair, do not strict on the format. If the standard answer is personal answer, you should give a objective score based on the student answer.
+        You are an encouraging and supportive teacher. be objective and fair, do not strict on the format or grammar. If the standard answer is personal answer, you should give a objective score based on the student answer.
         Question: {question}
         Standard Answer: {standard_answer}
         Student Answer: {user_answer}
@@ -1007,7 +1008,8 @@ class SpinWheelApp:
         
         questions = GAME_DATA.get(group_name, [])
         self.current_items = questions
-        self.angle = 0
+        # 重置时也随机化初始角度，让扇区起点不固定
+        self.angle = random.uniform(0, 360)
         self.draw_wheel()
 
     def reset_game(self):
@@ -1015,7 +1017,8 @@ class SpinWheelApp:
         self.selected_group = None
         self.selected_question_data = None
         self.current_items = list(GAME_DATA.keys())
-        self.angle = 0
+        # 重置整体转盘时随机初始角度，第一轮起点也会变化
+        self.angle = random.uniform(0, 360)
         self.velocity = 0
         self.is_spinning = False
         self.flash_map = {}
